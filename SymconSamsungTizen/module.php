@@ -47,12 +47,13 @@ class SamsungTizen extends IPSModule
         $this->RequireParent("{3AB77A94-3467-4E66-8A73-840B4AD89582}");
 
         //event erstellen
-        $this->RegisterTimer("CheckOnline", $this->ReadPropertyInteger("Interval"), 'SamsungTizen_CheckOnline($_IPS[\'TARGET\']);');
+        $this->RegisterTimer("CheckOnline", 0, 'SamsungTizen_CheckOnline($_IPS[\'TARGET\']);');
         $this->SetStatus(102);
     }
 
     public function ApplyChanges()
     {
+        $this->RegisterMessage(0, 10001 /* IPS_KERNELSTARTED */);
         // Diese Zeile nicht löschen
         parent::ApplyChanges();
         $this->SendDebug(__FUNCTION__, '', 0);
@@ -60,15 +61,17 @@ class SamsungTizen extends IPSModule
         $this->SendDebug(__FUNCTION__, '', 0);
         $this->RegisterVariableString('VariableToken', 'Token', "", 0);
         $this->RegisterVariableBoolean("VariableOnline", "Status", "~Switch", 0);
+        $this->SetValue("VariableOnline", false);
         $this->RegisterVariableString("VariableApps", "Apps", "", 0);
 
-        $this->SetTimerInterval("CheckOnline", 0);
+        //$this->SetTimerInterval("CheckOnline", 0);
 
         $this->RegisterMessage($this->InstanceID, 11101 /* FM_CONNECT */);
         $this->RegisterMessage($this->InstanceID, 11102 /* FM_DISCONNECT */);
-
-        $this->RegisterParent();
-        $this->UpdateConfigurationForParent();
+        if (IPS_GetKernelRunlevel() == 10103 /* KR_READY */) {
+            $this->RegisterParent();
+            $this->UpdateConfigurationForParent();
+        }
     }
 
     /**
@@ -183,17 +186,17 @@ class SamsungTizen extends IPSModule
 
         $ipAdress = $this->ReadPropertyString("IPAddress");
         if (Sys_Ping($ipAdress, 5000)) {
-            if ($this->GetValue("VariableOnline") == false) {
-                $this->SetValue("VariableOnline", true);
-                $this->SetTimerInterval("CheckOnline", 0);
-                $this->UpdateConfigurationForParent();
-            }
-        } else {
-            if ($this->GetValue("VariableOnline")) {
-                $this->SetValue("VariableOnline", false);
-                $this->SetStatus(104);
-            }
-        }
+//            if ($this->GetValue("VariableOnline") == false) {
+            //$this->SetValue("VariableOnline", true);
+            $this->SetTimerInterval("CheckOnline", 0);
+            $this->UpdateConfigurationForParent();
+            //          }
+        }/* else {
+          if ($this->GetValue("VariableOnline")) {
+          $this->SetValue("VariableOnline", false);
+          $this->SetStatus(104);
+          }
+          } */
     }
 
     public function TogglePower()
@@ -211,6 +214,10 @@ class SamsungTizen extends IPSModule
         $this->SendDebug(__FUNCTION__, '', 0);
         $this->SendDebug($Message . '.' . $SenderID, $Data, 0);
         switch ($Message) {
+            case 10001: /* IPS_KERNELSTARTED */
+                $this->RegisterParent();
+                $this->UpdateConfigurationForParent();
+                break;
             // Falls der User die übergeordnete Instanz ändert
             case 11101: /* FM_CONNECT */
                 // Neuer IO mit dieser Instanz verbunden.
@@ -235,7 +242,7 @@ class SamsungTizen extends IPSModule
                         $this->SendDebug("Connection", "IO connection establish", 0);
                         $this->SetStatus(102);
                         $this->SetTimerInterval("CheckOnline", 0);
-                        $this->SetValue("VariableOnline", true);
+                        //$this->SetValue("VariableOnline", true);
                         break;
                     case 104: // WebSocket ist inaktiv
                         $this->SendDebug("Connection", "IO connection closed", 0);
@@ -248,14 +255,14 @@ class SamsungTizen extends IPSModule
                         }
                         break;
                     default: // Fehlerzustände
-                        /*$this->SendDebug("Connection", "Samsung Tizen connection lost", 0);
-                        $this->SetValue("VariableOnline", false);
-                        $this->SetStatus(104);
-                        if ($this->ReadPropertyBoolean("Active")) {
-                            $this->SetTimerInterval("CheckOnline", $this->ReadPropertyInteger("Interval") * 1000);
-                        } else {
-                            $this->SetTimerInterval("CheckOnline", 0);
-                        }*/
+                        /* $this->SendDebug("Connection", "Samsung Tizen connection lost", 0);
+                          $this->SetValue("VariableOnline", false);
+                          $this->SetStatus(104);
+                          if ($this->ReadPropertyBoolean("Active")) {
+                          $this->SetTimerInterval("CheckOnline", $this->ReadPropertyInteger("Interval") * 1000);
+                          } else {
+                          $this->SetTimerInterval("CheckOnline", 0);
+                          } */
                         $this->SendDebug("Force close Websocket", $SenderID, 0);
                         // losgelöst vom aktuellen context, damit wir keinen DeathLock haben.
                         // Hierdurch wird wieder MessageSink mit case 104 (inaktiv) getriggert.
@@ -346,12 +353,13 @@ class SamsungTizen extends IPSModule
                                 $this->SetValue("VariableToken", $token);
                                 $this->SendDebug("Token", "New Token " . $token . " has been set", 0);
 
-                                $this->SetValue("VariableOnline", false);
-                                if ($this->ReadPropertyBoolean("Active")) {
-                                    $this->SetTimerInterval("CheckOnline", $this->ReadPropertyInteger("Interval") * 1000);
-                                } else {
-                                    $this->SetTimerInterval("CheckOnline", 0);
-                                }
+                                //$this->SetValue("VariableOnline", false);
+                                /*
+                                  if ($this->ReadPropertyBoolean("Active")) {
+                                  $this->SetTimerInterval("CheckOnline", $this->ReadPropertyInteger("Interval") * 1000);
+                                  } else {
+                                  $this->SetTimerInterval("CheckOnline", 0);
+                                  } */
 
                                 $this->UpdateConfigurationForParent();
                                 return;
